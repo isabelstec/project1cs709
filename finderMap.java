@@ -1,147 +1,270 @@
-package project1;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.util.Scanner;
-
 public class finderMap {
-    String[][] map;
-    int[][] visited;    
-    boolean finished = false;
-    static final int[][] dirSet = {{-1,0},{0,-1},{+1,0},{0,+1}};
-    completeRoute[] completed = new completeRoute[100];
-    int routeCount;
-    completeRoute cheapest = null;
-    int cheapestCost = Integer.MAX_VALUE;
-    int[] entrance = new int[2];
-     
-    public finderMap(String map){
-        //getting sizes and fixing formatting
-        String[] rows = map.split("\n");
-        int columns = rows[0].length();
 
-        //setting up arrays
-        this.map = new String[rows.length][columns];
-        this.visited = new int[rows.length][columns];
+    private final char[][] map;
+    private final int[][] costs;
+    private final int[][] visited;
 
-        //parsing map
-        for(int i = 0; i < rows.length; i++){
-            char[] line = rows[i].toCharArray();
-            for(int j = 0; j < line.length; j++){
-                if(line[j] == '#'){
-                    entrance[0] = i;
-                    entrance[1] = j;
+    private completeRoute[] routes;
+    private int routeCount;
+    private completeRoute bestRoute;
+
+    public finderMap(String map) {
+        if (map == null || map.length() == 0) {
+            throw new IllegalArgumentException("The maze is empty.");
+        }
+
+        String[] lines = map.split("\n");
+
+        int rows = lines.length;
+        int columns = lines[0].length();
+
+        if (columns == 0) {
+            throw new IllegalArgumentException(
+                    "The maze has an empty row.");
+        }
+
+        this.map = new char[rows][columns];
+        this.costs = new int[rows][columns];
+        this.visited = new int[rows][columns];
+
+        this.routes = new completeRoute[10];
+
+        String digits = "0123456789ABCDEF";
+        int starts = 0;
+        int exits = 0;
+
+        for (int y = 0; y < rows; y++) {
+            if (lines[y].length() != columns) {
+                throw new IllegalArgumentException(
+                        "Every row must have the same number of characters.");
+            }
+
+            for (int x = 0; x < columns; x++) {
+                char square = lines[y].charAt(x);
+                this.map[y][x] = square;
+
+                if (square == 'x' || square == 'X') {
+                    this.costs[y][x] = -1;
+                } else if (square == '#') {
+                    this.costs[y][x] = 0;
+                    starts++;
+                } else if (square == '!') {
+                    this.costs[y][x] = 0;
+                    exits++;
+                } else {
+                    int cost = digits.indexOf(square);
+
+                    if (cost == -1) {
+                        throw new IllegalArgumentException(
+                                "Pathways must use 0-9 or A-F.");
+                    }
+
+                    this.costs[y][x] = cost;
                 }
-                this.visited[i][j] = 0;
-                this.map[i][j] = String.valueOf(line[j]);
             }
         }
+
+        if (starts != 1 || exits != 1) {
+            throw new IllegalArgumentException(
+                    "The maze must contain one # and one !.");
+        }
     }
-    public boolean getPath(int x, int y){
-        if (map[x][y].equals("x")){
+
+    // Returns whether the location is inside the maze.
+    private boolean inBounds(int x, int y) {
+        return y >= 0 && y < this.map.length
+                && x >= 0 && x < this.map[y].length;
+    }
+
+    // Returns whether the square can be visited.
+    public boolean getPath(int x, int y) {
+        if (!inBounds(x, y)) {
             return false;
-        }return true;
+        }
+
+        return this.costs[y][x] >= 0;
     }
-    public int getVisited(int x, int y){
-        return visited[x][y];
+
+    // Returns the cost, or -1 for a wall or invalid location.
+    public int getCost(int x, int y) {
+        if (!inBounds(x, y)) {
+            return -1;
+        }
+
+        return this.costs[y][x];
     }
-    public void setVisited (int row, int col, int move) {
-		if ( row < 0 || row >= map.length || col < 0 || col >= map[row].length ) return;
-		if (getVisited(row, col) > 0) return;
-        if (!getPath(row, col) ) return;
 
-        //setVisited(row,col, 1);
-		visited[row][col] = move;
-        
-		if ( map[row][col].equals("!") ) {
-            completeRoute solution = new completeRoute(map, visited);
-
-            if(routeCount < completed.length){
-                completed[routeCount] = solution;
-                routeCount++;
-            }
-            if(solution.getCompleteCost()< cheapestCost){
-                cheapestCost = solution.getCompleteCost();
-                cheapest = solution;
-            }
-            visited[row][col] = 0;
-            return;
-		}
-        for (int i = 0 ; i < dirSet.length; i++ ) {
-			setVisited( row+dirSet[i][0], col+dirSet[i][1], move + 1 );
-		}
-
-        visited[row][col] = 0;
-	}
-
-    public int getCost(int x, int y){
-
-        if (map[x][y].equals("#") || map[x][y].equals("!") || map[x][y].equals("x") || map[x][y].equals("p")){
+    // Returns the step number, or 0 if unvisited or outside the maze.
+    public int getVisited(int x, int y) {
+        if (!inBounds(x, y)) {
             return 0;
         }
-        return Integer.parseInt(map[x][y], 16);
-    }
-    public void getString(){
-        int size = map.length;
-        int sum = 0;
-        String[][] current = new String[size][map[0].length];
-        for(int i = 0; i < size; i++){
-            for(int j = 0; j < map[i].length; j++){
-                if(map[i][j].equals("x")){
-                    current[i][j] = "x";
-                }
-                if(getPath(i,j) && visited[i][j] > 0){
-                    current[i][j] = Integer.toString( visited[i][j]);
-                    sum += getCost(i,j);
-                }
-                if(getPath(i,j) && visited[i][j] == 0){
-                    current[i][j] = Integer.toString( visited[i][j]);
-                }
-            }
-        }
-        for (int i = 0; i < size; i++) { 
-            for (int j = 0; j < map[i].length; j++) { 
-                System.out.print(current[i][j]);
-            }
-            System.out.println(); 
-        }
-        System.out.println("Total Cost: " + sum);
 
+        return this.visited[y][x];
     }
-    public void getMoves(){
-        int size = visited.length;
-        int[][] current = new int[size][visited[0].length];
-        for(int i = 0; i < size; i++){
-            for(int j = 0; j < visited[i].length; j++){
-                current[i][j] = visited[i][j];
-            }
-        }
-        for (int i = 0; i < size; i++) { 
-            for (int j = 0; j < map[i].length; j++) { 
-                System.out.print(current[i][j]);
-            }
-            System.out.println(); 
-        }
-    }
-    public static void main(String[] args){
-        if (args.length < 1) {
-            System.out.println("Error: Please provide a file path.");
-            System.exit(1); 
-        }
-        File file = new File(args[0]);
-        StringBuilder test = new StringBuilder();
 
-        try (Scanner scanner = new Scanner(file)) {
-            while (scanner.hasNextLine()) {
-                String line = scanner.nextLine();
-                test.append(line).append("\n");
-            }
-        } catch (FileNotFoundException e) {
-            System.err.println("Error: The file '" + args[0] + "' could not be found.");
+    // Stores a step number. A value of 0 erases a visit.
+    public boolean setVisited(int x, int y, int visitNum) {
+        if (!getPath(x, y) || visitNum < 0) {
+            return false;
         }
-        finderMap testmap = new finderMap(test.toString());
-        testmap.getString();
-        testmap.setVisited(testmap.entrance[0], testmap.entrance[1], 1);
-        testmap.cheapest.printRoute();
-        //testmap.getString(); //edit completeRoute to take the current visited array and update the map there
+
+        this.visited[y][x] = visitNum;
+        return true;
+    }
+
+    public int getRouteCount() {
+        return this.routeCount;
+    }
+
+    // Returns a saved route by its array index.
+    public completeRoute getRoute(int index) {
+        if (index < 0 || index >= this.routeCount) {
+            throw new IllegalArgumentException(
+                    "The route index is invalid.");
+        }
+
+        return this.routes[index];
+    }
+
+    public int getTotalCost() {
+        if (this.bestRoute == null) {
+            return 0;
+        }
+
+        return this.bestRoute.getTotalCost();
+    }
+
+    public int getTotalMoves() {
+        if (this.bestRoute == null) {
+            return 0;
+        }
+
+        return this.bestRoute.getTotalMoves();
+    }
+
+    // Saves a completed route and checks its cost.
+    private void saveRoute(int currentCost, int totalMoves) {
+        completeRoute route = new completeRoute(
+                this.visited, currentCost, totalMoves);
+
+        // Make a larger array if the current array is full.
+        if (this.routeCount == this.routes.length) {
+            completeRoute[] larger =
+                    new completeRoute[this.routes.length * 2];
+
+            for (int i = 0; i < this.routeCount; i++) {
+                larger[i] = this.routes[i];
+            }
+
+            this.routes = larger;
+        }
+
+        this.routes[this.routeCount] = route;
+        this.routeCount++;
+
+        if (this.bestRoute == null
+                || route.getTotalCost() < this.bestRoute.getTotalCost()) {
+            this.bestRoute = route;
+        }
+    }
+
+    // Searches all routes and restores the lowest-cost route for display.
+    public boolean solve() {
+        this.routes = new completeRoute[10];
+        this.routeCount = 0;
+        this.bestRoute = null;
+
+        int startX = -1;
+        int startY = -1;
+
+        for (int y = 0; y < this.map.length; y++) {
+            for (int x = 0; x < this.map[y].length; x++) {
+                this.visited[y][x] = 0;
+
+                if (this.map[y][x] == '#') {
+                    startX = x;
+                    startY = y;
+                }
+            }
+        }
+
+        floodFill(startX, startY, 1, 0);
+
+        if (this.bestRoute == null) {
+            return false;
+        }
+
+        // Copy the best saved route into the display array.
+        for (int y = 0; y < this.visited.length; y++) {
+            for (int x = 0; x < this.visited[y].length; x++) {
+                this.visited[y][x] = this.bestRoute.getStep(x, y);
+            }
+        }
+
+        return true;
+    }
+
+    // Explores every route without revisiting a square in the current route.
+    private void floodFill(int x, int y, int visitNum,
+            int currentCost) {
+
+        if (!getPath(x, y)) {
+            return;
+        }
+
+        if (getVisited(x, y) != 0) {
+            return;
+        }
+
+        setVisited(x, y, visitNum);
+        currentCost += getCost(x, y);
+
+        if (this.map[y][x] == '!') {
+            saveRoute(currentCost, visitNum - 1);
+        } else {
+            // Try up.
+            floodFill(x, y - 1, visitNum + 1, currentCost);
+
+            // Try down.
+            floodFill(x, y + 1, visitNum + 1, currentCost);
+
+            // Try left.
+            floodFill(x - 1, y, visitNum + 1, currentCost);
+
+            // Try right.
+            floodFill(x + 1, y, visitNum + 1, currentCost);
+        }
+
+        // Erase this visit so another route can use the square.
+        setVisited(x, y, 0);
+    }
+
+    // Returns the maze with the lowest-cost route numbered.
+    public String getString() {
+        StringBuilder result = new StringBuilder();
+
+        int maxSteps = this.map.length * this.map[0].length;
+        int width = Integer.toString(maxSteps).length() + 1;
+
+        for (int y = 0; y < this.map.length; y++) {
+            for (int x = 0; x < this.map[y].length; x++) {
+                String square;
+
+                if (this.visited[y][x] > 0) {
+                    square = Integer.toString(this.visited[y][x]);
+                } else {
+                    square = Character.toString(this.map[y][x]);
+                }
+
+                result.append(String.format("%" + width + "s", square));
+            }
+
+            if (y < this.map.length - 1) {
+                result.append('\n');
+            }
+        }
+
+        return result.toString();
     }
 }
