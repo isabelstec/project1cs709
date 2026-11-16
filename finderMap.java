@@ -4,9 +4,8 @@ public class finderMap {
     private final int[][] costs;
     private final int[][] visited;
 
-    private completeRoute[] routes;
-    private int routeCount;
-    private completeRoute bestRoute;
+    private int totalCost;
+    private int totalMoves;
 
     public finderMap(String map) {
         if (map == null || map.length() == 0) {
@@ -26,8 +25,6 @@ public class finderMap {
         this.map = new char[rows][columns];
         this.costs = new int[rows][columns];
         this.visited = new int[rows][columns];
-
-        this.routes = new completeRoute[10];
 
         String digits = "0123456789ABCDEF";
         int starts = 0;
@@ -113,134 +110,85 @@ public class finderMap {
         return true;
     }
 
-    public int getRouteCount() {
-        return this.routeCount;
-    }
-
-    // Returns a saved route by its array index.
-    public completeRoute getRoute(int index) {
-        if (index < 0 || index >= this.routeCount) {
-            throw new IllegalArgumentException(
-                    "The route index is invalid.");
-        }
-
-        return this.routes[index];
-    }
-
+    // Returns the cost of the successful route.
     public int getTotalCost() {
-        if (this.bestRoute == null) {
-            return 0;
-        }
-
-        return this.bestRoute.getTotalCost();
+        return this.totalCost;
     }
 
+    // Returns the number of moves in the successful route.
     public int getTotalMoves() {
-        if (this.bestRoute == null) {
-            return 0;
-        }
-
-        return this.bestRoute.getTotalMoves();
+        return this.totalMoves;
     }
 
-    // Saves a completed route and checks its cost.
-    private void saveRoute(int currentCost, int totalMoves) {
-        completeRoute route = new completeRoute(
-                this.visited, currentCost, totalMoves);
-
-        // Make a larger array if the current array is full.
-        if (this.routeCount == this.routes.length) {
-            completeRoute[] larger =
-                    new completeRoute[this.routes.length * 2];
-
-            for (int i = 0; i < this.routeCount; i++) {
-                larger[i] = this.routes[i];
-            }
-
-            this.routes = larger;
-        }
-
-        this.routes[this.routeCount] = route;
-        this.routeCount++;
-
-        if (this.bestRoute == null
-                || route.getTotalCost() < this.bestRoute.getTotalCost()) {
-            this.bestRoute = route;
-        }
-    }
-
-    // Searches all routes and restores the lowest-cost route for display.
+    // Clears previous visits and finds the starting square.
     public boolean solve() {
-        this.routes = new completeRoute[10];
-        this.routeCount = 0;
-        this.bestRoute = null;
+        this.totalCost = 0;
+        this.totalMoves = 0;
 
-        int startX = -1;
-        int startY = -1;
+        for (int y = 0; y < this.visited.length; y++) {
+            for (int x = 0; x < this.visited[y].length; x++) {
+                this.visited[y][x] = 0;
+            }
+        }
 
         for (int y = 0; y < this.map.length; y++) {
             for (int x = 0; x < this.map[y].length; x++) {
-                this.visited[y][x] = 0;
-
                 if (this.map[y][x] == '#') {
-                    startX = x;
-                    startY = y;
+                    return floodFill(x, y, 1, 0);
                 }
             }
         }
 
-        floodFill(startX, startY, 1, 0);
-
-        if (this.bestRoute == null) {
-            return false;
-        }
-
-        // Copy the best saved route into the display array.
-        for (int y = 0; y < this.visited.length; y++) {
-            for (int x = 0; x < this.visited[y].length; x++) {
-                this.visited[y][x] = this.bestRoute.getStep(x, y);
-            }
-        }
-
-        return true;
+        return false;
     }
 
-    // Explores every route without revisiting a square in the current route.
-    private void floodFill(int x, int y, int visitNum,
+    // Recursively searches for the exit and erases incorrect moves.
+    private boolean floodFill(int x, int y, int visitNum,
             int currentCost) {
 
         if (!getPath(x, y)) {
-            return;
+            return false;
         }
 
         if (getVisited(x, y) != 0) {
-            return;
+            return false;
         }
 
         setVisited(x, y, visitNum);
         currentCost += getCost(x, y);
 
         if (this.map[y][x] == '!') {
-            saveRoute(currentCost, visitNum - 1);
-        } else {
-            // Try up.
-            floodFill(x, y - 1, visitNum + 1, currentCost);
-
-            // Try down.
-            floodFill(x, y + 1, visitNum + 1, currentCost);
-
-            // Try left.
-            floodFill(x - 1, y, visitNum + 1, currentCost);
-
-            // Try right.
-            floodFill(x + 1, y, visitNum + 1, currentCost);
+            this.totalCost = currentCost;
+            this.totalMoves = visitNum - 1;
+            return true;
         }
 
-        // Erase this visit so another route can use the square.
+        // Try up.
+        if (floodFill(x, y - 1, visitNum + 1, currentCost)) {
+            return true;
+        }
+
+        // Try down.
+        if (floodFill(x, y + 1, visitNum + 1, currentCost)) {
+            return true;
+        }
+
+        // Try left.
+        if (floodFill(x - 1, y, visitNum + 1, currentCost)) {
+            return true;
+        }
+
+        // Try right.
+        if (floodFill(x + 1, y, visitNum + 1, currentCost)) {
+            return true;
+        }
+
+        // All directions failed, so erase this move.
         setVisited(x, y, 0);
+        return false;
     }
 
-    // Returns the maze with the lowest-cost route numbered.
+    // Returns the maze with numbered steps on the successful route.
     public String getString() {
         StringBuilder result = new StringBuilder();
 
